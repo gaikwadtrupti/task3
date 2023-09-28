@@ -1,0 +1,310 @@
+Handwritten digit recongnition system not only detects scanned image of handwritten digit recognition using MINST dataset is a major project made with the help of neural network it basically detects the scanned image of handwritten digits
+
+import tensorflow as tf
+import matplotlib.pyplot as plt
+import seaborn as sn
+import numpy as np
+import pandas as pd 
+import math
+import datetime
+import platform
+import os
+for dirname, _, filenames in os.walk('/kaggle/input'):
+    for filename in filenames:
+        print(os.path.join(dirname, filename))
+
+train = pd.read_csv('train.csv')
+test = pd.read_csv('test.csv')
+train.head()
+
+	label	pixel0	pixel1	pixel2	pixel3	pixel4	pixel5	pixel6	pixel7	pixel8	...	pixel774	pixel775	pixel776	pixel777	pixel778	pixel779	pixel780	pixel781	pixel782	pixel783
+0	1	0	0	0	0	0	0	0	0	0	...	0	0	0	0	0	0	0	0	0	0
+1	0	0	0	0	0	0	0	0	0	0	...	0	0	0	0	0	0	0	0	0	0
+2	1	0	0	0	0	0	0	0	0	0	...	0	0	0	0	0	0	0	0	0	0
+3	4	0	0	0	0	0	0	0	0	0	...	0	0	0	0	0	0	0	0	0	0
+4	0	0	0	0	0	0	0	0	0	0	...	0	0	0	0	0	0	0	0	0	0
+5 rows × 785 columns
+
+train.info(), train.shape
+<class 'pandas.core.frame.DataFrame'>
+RangeIndex: 42000 entries, 0 to 41999
+Columns: 785 entries, label to pixel783
+dtypes: int64(785)
+memory usage: 251.5 MB
+(None, (42000, 785))
+
+test.info(),  test.shape
+<class 'pandas.core.frame.DataFrame'>
+RangeIndex: 28000 entries, 0 to 27999
+Columns: 784 entries, pixel0 to pixel783
+dtypes: int64(784)
+memory usage: 167.5 MB
+(None, (28000, 784))
+
+X = train.iloc[:, 1:785]
+y = train.iloc[:, 0]
+X_test = test.iloc[:, 0:784]
+
+X_tsn = X/255
+from sklearn.manifold import TSNE
+tsne = TSNE()
+tsne_res = tsne.fit_transform(X_tsn)
+
+plt.figure(figsize=(14, 12))
+plt.scatter(tsne_res[:,0], tsne_res[:,1], c=y, s=2)
+plt.xticks([])
+plt.yticks([])
+plt.colorbar();
+
+from sklearn.model_selection import train_test_split
+X_train, X_validation, y_train, y_validation = train_test_split(X, y, test_size = 0.2,random_state = 1212)
+
+print('X_train:', X_train.shape)
+print('y_train:', y_train.shape)
+print('X_validation:', X_validation.shape)
+print('y_validation:', y_validation.shape)
+
+X_train: (33600, 784)
+y_train: (33600,)
+X_validation: (8400, 784)
+y_validation: (8400,)
+
+## Converting training, testing, and validation data into array
+x_train_re = X_train.to_numpy().reshape(33600, 28, 28)
+y_train_re = y_train.values
+x_validation_re = X_validation.to_numpy().reshape(8400, 28, 28)
+y_validation_re = y_validation.values
+x_test_re = test.to_numpy().reshape(28000, 28, 28)
+
+## Dimension of training, testing, and validation data after reshaping
+print('x_train:', x_train_re.shape)
+print('y_train:', y_train_re.shape)
+print('x_validation:', x_validation_re.shape)
+print('y_validation:', y_validation_re.shape)
+print('x_test:', x_test_re.shape)
+
+x_train: (33600, 28, 28)
+y_train: (33600,)
+x_validation: (8400, 28, 28)
+y_validation: (8400,)
+x_test: (28000, 28, 28)
+
+(_, IMAGE_WIDTH, IMAGE_HEIGHT) = x_train_re.shape
+IMAGE_CHANNELS = 1
+
+print('IMAGE_WIDTH:', IMAGE_WIDTH);
+print('IMAGE_HEIGHT:', IMAGE_HEIGHT);
+print('IMAGE_CHANNELS:', IMAGE_CHANNELS);
+IMAGE_WIDTH: 28
+IMAGE_HEIGHT: 28
+IMAGE_CHANNELS: 1
+
+ ##Explore the data
+pd.DataFrame(x_train_re[0])
+
+## Visualise how the digits were written 
+plt.imshow(x_train_re[0], cmap=plt.cm.binary)
+plt.show()
+
+numbers_to_display = 100
+num_cells = math.ceil(math.sqrt(numbers_to_display))
+plt.figure(figsize=(20,20))
+for i in range(numbers_to_display):
+    plt.subplot(num_cells, num_cells, i+1)
+    plt.xticks([])
+    plt.yticks([])
+    plt.grid(False)
+    plt.imshow(x_train_re[i], cmap=plt.cm.binary)
+    plt.xlabel(y_train_re[i])
+plt.show()
+
+##Reshaping train, test, and validation data 
+x_train_with_chanels = x_train_re.reshape(
+    x_train_re.shape[0],
+    IMAGE_WIDTH,
+    IMAGE_HEIGHT,
+    IMAGE_CHANNELS
+)
+
+x_validation_with_chanels = x_validation_re.reshape(
+    x_validation_re.shape[0],
+    IMAGE_WIDTH,
+    IMAGE_HEIGHT,
+    IMAGE_CHANNELS
+)
+
+x_test_with_chanels = x_test_re.reshape(
+    x_test_re.shape[0],
+    IMAGE_WIDTH,
+    IMAGE_HEIGHT,
+    IMAGE_CHANNELS
+)
+print('x_train_with_chanels:', x_train_with_chanels.shape)
+print('x_validation_with_chanels:', x_validation_with_chanels.shape)
+print('x_test_with_chanels:', x_test_with_chanels.shape)
+
+x_train_normalized = x_train_with_chanels / 255
+x_validation_normalized = x_validation_with_chanels / 255
+x_test_normalized = x_test_with_chanels / 255
+x_train_normalized[0][10]
+
+model = tf.keras.models.Sequential()
+
+model.add(tf.keras.layers.Convolution2D(
+    input_shape=(IMAGE_WIDTH, IMAGE_HEIGHT, IMAGE_CHANNELS),
+    kernel_size=5,
+    filters=8,
+    strides=1,
+    activation=tf.keras.activations.relu,
+    kernel_initializer=tf.keras.initializers.VarianceScaling()
+))
+
+model.add(tf.keras.layers.MaxPooling2D(
+    pool_size=(2, 2),
+    strides=(2, 2)
+))
+model.add(tf.keras.layers.Convolution2D(
+    kernel_size=5,
+    filters=16,
+    strides=1,
+    activation=tf.keras.activations.relu,
+    kernel_initializer=tf.keras.initializers.VarianceScaling()
+))
+
+model.add(tf.keras.layers.MaxPooling2D(
+    pool_size=(2, 2),
+    strides=(2, 2)
+))
+model.add(tf.keras.layers.Flatten())
+
+model.add(tf.keras.layers.Dense(
+    units=128,
+    activation=tf.keras.activations.relu
+));
+
+model.add(tf.keras.layers.Dropout(0.2))
+
+model.add(tf.keras.layers.Dense(
+    units=10,
+    activation=tf.keras.activations.softmax,
+    kernel_initializer=tf.keras.initializers.VarianceScaling()
+))
+##Summary of the training model 
+model.summary()
+##Visualization of the model
+tf.keras.utils.plot_model(
+    model,
+    show_shapes=True,
+    show_layer_names=True,
+)
+
+##Compile the model using keras.optimizers.Adam 
+adam_optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
+
+model.compile(
+    optimizer=adam_optimizer,
+    loss=tf.keras.losses.sparse_categorical_crossentropy,
+    metrics=['accuracy']
+)
+##Train the model 
+log_dir=".logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1)
+
+training_history = model.fit(
+    x_train_normalized,
+    y_train_re,
+    epochs=10,
+    validation_data=(x_validation_normalized, y_validation_re),
+    callbacks=[tensorboard_callback]
+)
+print("The model has successfully trained")
+##Model evaluation 
+plt.xlabel('Epoch Number')
+plt.ylabel('Accuracy')
+plt.plot(training_history.history['loss'], label='training set')
+plt.plot(training_history.history['val_loss'], label='validation set')
+plt.legend()
+plt.xlabel('Epoch Number')
+plt.ylabel('Accuracy')
+plt.plot(training_history.history['accuracy'], label='training set')
+plt.plot(training_history.history['val_accuracy'], label='validation set')
+plt.legend()
+
+print('Train loss: ', train_loss)
+print('Train accuracy: ', train_accuracy)
+
+%%capture
+validation_loss, validation_accuracy = model.evaluate(x_validation_normalized, y_validation_re)
+print('Validation loss: ', validation_loss)
+print('Validation accuracy: ', validation_accuracy)
+
+##Save and load the model
+model_name = 'digits_recognition_cnn.h5'
+model.save(model_name, save_format='h5')
+loaded_model = tf.keras.models.load_model(model_name)
+
+##Visualise validation predicted data 
+predictions_one_hot = loaded_model.predict([x_validation_normalized])
+
+print('predictions_one_hot:', predictions_one_hot.shape)
+
+pd.DataFrame(predictions_one_hot)
+
+predictions = np.argmax(predictions_one_hot, axis=1)
+pd.DataFrame(predictions)
+
+plt.imshow(x_validation_normalized[0].reshape((IMAGE_WIDTH, IMAGE_HEIGHT)), cmap=plt.cm.binary)
+plt.show()
+
+numbers_to_display = 196
+num_cells = math.ceil(math.sqrt(numbers_to_display))
+plt.figure(figsize=(15, 15))
+
+for plot_index in range(numbers_to_display):    
+    predicted_label = predictions[plot_index]
+    plt.xticks([])
+    plt.yticks([])
+    plt.grid(False)
+    color_map = 'Greens' if predicted_label == y_validation_re[plot_index] else 'Reds'
+    plt.subplot(num_cells, num_cells, plot_index + 1)
+    plt.imshow(x_validation_normalized[plot_index].reshape((IMAGE_WIDTH, IMAGE_HEIGHT)), cmap=color_map)
+    plt.xlabel(predicted_label)
+plt.subplots_adjust(hspace=1, wspace=0.5)
+plt.show()
+
+##Confusion matrix of validation dataset
+confusion_matrix = tf.math.confusion_matrix(y_validation_re, predictions)
+f, ax = plt.subplots(figsize=(9, 7))
+sn.heatmap(
+    confusion_matrix,
+    annot=True,
+    linewidths=.5,
+    fmt="d",
+    square=True,
+    ax=ax
+)
+plt.show()
+
+predictions_one_hot = loaded_model.predict([x_test_normalized])
+print('predictions_one_hot:', predictions_one_hot.shape)
+
+pd.DataFrame(predictions_one_hot)
+
+plt.imshow(x_test_normalized[0].reshape((IMAGE_WIDTH, IMAGE_HEIGHT)), cmap=plt.cm.binary)
+plt.show()
+
+test_pred = pd.DataFrame( loaded_model.predict([x_test_normalized]))
+test_pred = pd.DataFrame(test_pred.idxmax(axis = 1))
+test_pred.index.name = 'ImageId'
+test_pred = test_pred.rename(columns = {0: 'Label'}).reset_index()
+test_pred['ImageId'] = test_pred['ImageId'] + 1
+
+test_pred.head()
+
+test_pred = pd.DataFrame( loaded_model.predict([x_test_normalized]))
+test_pred = pd.DataFrame(test_pred.idxmax(axis = 1))
+test_pred.index.name = 'ImageId'
+test_pred = test_pred.rename(columns = {0: 'Label'}).reset_index()
+test_pred['ImageId'] = test_pred['ImageId'] + 1
+
+test_pred.head()
